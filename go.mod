@@ -1,4 +1,4 @@
-module dj13SDDownloader
+module github.com/xh-dev-go/dj13SDDownloader
 
 go 1.17
 
