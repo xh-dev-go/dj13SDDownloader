@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 )
@@ -47,7 +48,9 @@ func main() {
 	var dummyBool bool
 
 	var imageFileName, scriptName, updateScriptName, host, pattern string
-	var urlOnly, useStdin, useFile, updateFile, useClipboard, out, dryRun, showVersion bool
+	var pngFileName string
+	var urlOnly, useStdin, useFile, updateFile, useClipboard, out, dryRun, showVersion, withPng bool
+	var pngScale int
 	flag.BoolVar(&showVersion, "version", false, "Show the software version")
 	flag.StringVar(&host, "host", "https://sequence.davidje13.com", "The host of processing site")
 	flag.StringVar(&pattern, "naming-pattern", "", fmt.Sprintf("common naming pattern for the file naming:\n script-name={pattern}.%s\n img-file={pattern}.{img-extension}\n update-script-name={pattern}.%s\n", SD_EXTENSION, SD_EXTENSION))
@@ -63,6 +66,8 @@ func main() {
 	flag.BoolVar(&urlOnly, "output-url", false, "output url for the file")
 	flag.BoolVar(&dummyBool, "output-stdout", false, "[default]output svg to stdout")
 	flag.BoolVar(&dryRun, "dry-run", false, "only show the step to execute without actual action")
+	flag.BoolVar(&withPng, "export-png", false, "also export as png")
+	flag.IntVar(&pngScale, "png-scale", 3, "scale to {png-scale}X of origin svg")
 	flag.Parse()
 
 	if showVersion {
@@ -86,13 +91,23 @@ func main() {
 	}
 
 	var storeAs = FORMAT_SVG
+	svgSuffix := ".svg"
+	pngSuffix := ".png"
 	if out {
 		if imageFileName == "" && pattern == "" {
 			panic("either {img-file} or {pattern} should be set")
 		} else if imageFileName == "" && pattern != "" {
 			switch storeAs {
 			case FORMAT_SVG:
-				imageFileName = pattern + ".svg"
+				imageFileName = pattern + svgSuffix
+			}
+		}
+
+		if withPng {
+			if strings.HasSuffix(imageFileName,svgSuffix){
+				pngFileName = imageFileName[0: len(imageFileName)-len(svgSuffix)]+pngSuffix
+			} else {
+				pngFileName = imageFileName+pngSuffix
 			}
 		}
 	}
@@ -113,6 +128,9 @@ func main() {
 		}
 		if out {
 			fmt.Println("Output image: " + imageFileName)
+			if withPng {
+				fmt.Println("output with png: "+ imageFileName)
+			}
 		}
 
 		os.Exit(0)
@@ -137,7 +155,7 @@ func main() {
 	diagramScript = strings.ReplaceAll(diagramScript, "%2F", "/")
 	diagramScript = strings.ReplaceAll(diagramScript, "+", "%20")
 
-	urlStr := host + "/render/" + diagramScript + ".svg"
+	urlStr := host + "/render/" + diagramScript + svgSuffix
 	if urlOnly {
 		fmt.Println(urlStr)
 		os.Exit(0)
@@ -161,6 +179,9 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
+
+			cmd := exec.Command("svgexport", imageFileName, pngFileName, fmt.Sprintf("%dx", pngScale))
+			cmd.Run()
 		} else {
 			fmt.Println(string(bodyBytes))
 		}

@@ -1,6 +1,12 @@
 # dj13SDDownloader
 command line downloader sequence diagram from https://sequence.davidje13.com/
 
+# Dependency Command
+The app require nodejs dependency svgexport
+```shell
+npm install svgexport -g
+```
+
 ## Download
 
 [Download Link](https://github.com/xh-dev-go/dj13SDDownloader/blob/master/bin/dj13SDDownloader.exe?raw=true)
