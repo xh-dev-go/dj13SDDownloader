@@ -42,7 +42,7 @@ func ReadFromClipboard() string {
 const SD_EXTENSION = "sddsl"
 const FORMAT_SVG = "svg"
 
-const Version = "1.0.0 - 2022-01-03"
+const Version = "1.0.1 - 2022-01-21"
 
 func main() {
 	var dummyBool bool
