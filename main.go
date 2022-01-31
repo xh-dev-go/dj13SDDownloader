@@ -50,7 +50,7 @@ var Version string
 
 var client = &http.Client{}
 
-func uploadFile(url string, file *os.File, outFileName string) {
+func uploadFile(url string, file *os.File, outFileName string, scale int) {
 	var b bytes.Buffer
 	w := multipart.NewWriter(&b)
 
@@ -72,6 +72,7 @@ func uploadFile(url string, file *os.File, outFileName string) {
 	}
 	// Don't forget to set the content type, this will contain the boundary.
 	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("X-SCALE-TO", fmt.Sprintf("%d",scale))
 
 	// Submit the request
 	res, err := client.Do(req)
@@ -255,7 +256,7 @@ func main() {
 				if err != nil {
 					panic(err)
 				}
-				uploadFile(pngWebUrl, fileInput, pngFileName)
+				uploadFile(pngWebUrl, fileInput, pngFileName, pngScale)
 			}
 		} else {
 			fmt.Println(string(bodyBytes))
