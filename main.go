@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	_ "embed"
 	"flag"
 	"fmt"
 	"github.com/atotto/clipboard"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"os"
@@ -42,14 +45,66 @@ func ReadFromClipboard() string {
 const SD_EXTENSION = "sddsl"
 const FORMAT_SVG = "svg"
 
-const Version = "1.0.1 - 2022-01-21"
+//go:embed version
+var Version string
+
+var client = &http.Client{}
+
+func uploadFile(url string, file *os.File, outFileName string) {
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+
+	if fw, err := w.CreateFormFile("upload", file.Name()); err != nil {
+		panic(err)
+	} else if _, err := io.Copy(fw, file); err != nil {
+		panic(err)
+	}
+
+	err := w.Close()
+	if err != nil {
+		return
+	}
+
+	// Now that you have a form, you can submit it to your handler.
+	req, err := http.NewRequest("POST", url, &b)
+	if err != nil {
+		return
+	}
+	// Don't forget to set the content type, this will contain the boundary.
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	// Submit the request
+	res, err := client.Do(req)
+	if err != nil {
+		return
+	}
+
+	// Check the response
+	if res.StatusCode != http.StatusOK {
+		err = fmt.Errorf("bad status: %s", res.Status)
+		panic(err)
+	}
+
+	outFile, err := os.Create(outFileName)
+	if err != nil {
+		return
+	}
+	defer outFile.Close()
+
+	_, err = io.Copy(outFile, res.Body)
+	if err != nil {
+		return
+	}
+
+	return
+}
 
 func main() {
 	var dummyBool bool
 
 	var imageFileName, scriptName, updateScriptName, host, pattern string
-	var pngFileName string
-	var urlOnly, useStdin, useFile, updateFile, useClipboard, out, dryRun, showVersion, withPng bool
+	var pngFileName, pngWebUrl string
+	var urlOnly, useStdin, useFile, updateFile, useClipboard, out, dryRun, showVersion, withPng, pngLocal bool
 	var pngScale int
 	flag.BoolVar(&showVersion, "version", false, "Show the software version")
 	flag.StringVar(&host, "host", "https://sequence.davidje13.com", "The host of processing site")
@@ -67,11 +122,18 @@ func main() {
 	flag.BoolVar(&dummyBool, "output-stdout", false, "[default]output svg to stdout")
 	flag.BoolVar(&dryRun, "dry-run", false, "only show the step to execute without actual action")
 	flag.BoolVar(&withPng, "export-png", false, "also export as png")
+	flag.BoolVar(&pngLocal, "png-local", false, "use local node svgExport rather than png web svgExport service")
+	flag.StringVar(&pngWebUrl, "png-web-url", "https://convert-svg-png.mytools.express", "the web svg to png service url")
 	flag.IntVar(&pngScale, "png-scale", 3, "scale to {png-scale}X of origin svg")
 	flag.Parse()
 
+	if len(os.Args) == 1 {
+		flag.Usage()
+		os.Exit(0)
+	}
+
 	if showVersion {
-		fmt.Println("version: "+Version)
+		fmt.Println("version: " + Version)
 		os.Exit(0)
 	}
 
@@ -104,10 +166,10 @@ func main() {
 		}
 
 		if withPng {
-			if strings.HasSuffix(imageFileName,svgSuffix){
-				pngFileName = imageFileName[0: len(imageFileName)-len(svgSuffix)]+pngSuffix
+			if strings.HasSuffix(imageFileName, svgSuffix) {
+				pngFileName = imageFileName[0:len(imageFileName)-len(svgSuffix)] + pngSuffix
 			} else {
-				pngFileName = imageFileName+pngSuffix
+				pngFileName = imageFileName + pngSuffix
 			}
 		}
 	}
@@ -129,7 +191,12 @@ func main() {
 		if out {
 			fmt.Println("Output image: " + imageFileName)
 			if withPng {
-				fmt.Println("output with png: "+ imageFileName)
+				fmt.Println("output with png: " + pngFileName)
+			}
+			if pngLocal {
+				fmt.Println("output png with local command svgExport.(Please ensure svgExport is installed. npm install -g svgExport)")
+			} else {
+				fmt.Printf("output png with web svg to png service. (host: %s)\n", pngWebUrl)
 			}
 		}
 
@@ -160,7 +227,7 @@ func main() {
 		fmt.Println(urlStr)
 		os.Exit(0)
 	}
-	response, err := http.Get(urlStr)
+	response, err := client.Get(urlStr)
 	if err != nil {
 		panic(err)
 	} else if response.StatusCode != 200 {
@@ -180,8 +247,16 @@ func main() {
 				panic(err)
 			}
 
-			cmd := exec.Command("svgexport", imageFileName, pngFileName, fmt.Sprintf("%dx", pngScale))
-			cmd.Run()
+			if pngLocal {
+				cmd := exec.Command("svgexport", imageFileName, pngFileName, fmt.Sprintf("%dx", pngScale))
+				cmd.Run()
+			} else {
+				fileInput,err := os.Open(imageFileName)
+				if err != nil {
+					panic(err)
+				}
+				uploadFile(pngWebUrl, fileInput, pngFileName)
+			}
 		} else {
 			fmt.Println(string(bodyBytes))
 		}
