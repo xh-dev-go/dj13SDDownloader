@@ -24,6 +24,8 @@ jobs:
         run: go test -v ./...
       - name: Get tag version
         run: echo "TAG_VERSION=$(echo $GITHUB_REF | cut -d / -f 3)" >> $GITHUB_ENV
+      - name: Show tag message
+        run: echo "$(git tag -n10 $TAG_VERSION)"
       - name: Get tag message
         run: echo "TAG_MESSAGE=$(git tag -n10 $TAG_VERSION)" >> $GITHUB_ENV
       - name: Create Release
