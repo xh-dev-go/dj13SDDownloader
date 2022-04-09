@@ -42,6 +42,23 @@ func ReadFromClipboard() string {
 	return data
 }
 
+func ProcessScript(diagramScript string) string {
+	tempReplacing := "!@#$)(*"
+	diagramScript = strings.ReplaceAll(diagramScript, "/", tempReplacing)
+	diagramScript = strings.ReplaceAll(diagramScript, "\r", "")
+	var re = regexp.MustCompile("\n+")
+	diagramScript = re.ReplaceAllString(diagramScript, `/`)
+	diagramScript = url.QueryEscape(diagramScript)
+	diagramScript = strings.ReplaceAll(diagramScript, "%2F", "/")
+	diagramScript = strings.ReplaceAll(diagramScript, "%21%40%23%24%29%28%2A", "%2F")
+	diagramScript = strings.ReplaceAll(diagramScript, "+", "%20")
+	diagramScript = strings.ReplaceAll(diagramScript, "%2A", "*")
+	diagramScript = strings.ReplaceAll(diagramScript, "%28", "(")
+	diagramScript = strings.ReplaceAll(diagramScript, "%29", ")")
+	diagramScript = strings.Trim(diagramScript, "/")
+	return diagramScript
+}
+
 const SD_EXTENSION = "sddsl"
 const FORMAT_SVG = "svg"
 
@@ -72,7 +89,7 @@ func uploadFile(url string, file *os.File, outFileName string, scale int) {
 	}
 	// Don't forget to set the content type, this will contain the boundary.
 	req.Header.Set("Content-Type", w.FormDataContentType())
-	req.Header.Set("X-SCALE-TO", fmt.Sprintf("%d",scale))
+	req.Header.Set("X-SCALE-TO", fmt.Sprintf("%d", scale))
 
 	// Submit the request
 	res, err := client.Do(req)
@@ -214,14 +231,7 @@ func main() {
 	}
 	originDiagramScript := diagramScript
 
-	tempReplacing := "!@#$)(*"
-	diagramScript = strings.ReplaceAll(diagramScript, "/", tempReplacing)
-	var re = regexp.MustCompile("(\n+)")
-	diagramScript = re.ReplaceAllString(diagramScript, `/`)
-	diagramScript = strings.ReplaceAll(diagramScript, tempReplacing, "/")
-	diagramScript = url.QueryEscape(diagramScript)
-	diagramScript = strings.ReplaceAll(diagramScript, "%2F", "/")
-	diagramScript = strings.ReplaceAll(diagramScript, "+", "%20")
+	diagramScript = ProcessScript(diagramScript)
 
 	urlStr := host + "/render/" + diagramScript + svgSuffix
 	if urlOnly {
@@ -252,7 +262,7 @@ func main() {
 				cmd := exec.Command("svgexport", imageFileName, pngFileName, fmt.Sprintf("%dx", pngScale))
 				cmd.Run()
 			} else {
-				fileInput,err := os.Open(imageFileName)
+				fileInput, err := os.Open(imageFileName)
 				if err != nil {
 					panic(err)
 				}
